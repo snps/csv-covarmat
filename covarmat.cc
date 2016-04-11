@@ -3,12 +3,16 @@
 #include <algorithm>
 #include <cstdlib>
 #include <fstream>
+#include <sstream>
 #include <iostream>
 #include <iterator>
 #include <string>
 #include <vector>
 
 static constexpr const char DELIM = ',';
+
+using instance_value_t = double;
+using column_t = std::vector<instance_value_t>;
 
 namespace read {
     class line {
@@ -47,18 +51,39 @@ int main(int argc, char* argv[]) {
     {
         std::ifstream file{argv[1]};
 
-//        std::transform(std::istream_iterator<read::line>{file},
-//                       std::istream_iterator<read::line>{},
-//                       std::begin(instances),
-//                       [] (const std::string& line) {
-//            return line;
-//        });
+        std::transform(std::istream_iterator<read::line>{file},
+                       std::istream_iterator<read::line>{},
+                       std::back_inserter(instances),
+                       [] (const std::string& line) {
+            return line;
+        });
     }
     std::cout << "Read " << instances.size() << " instances from file." <<std::endl;
 
-    using instance_value_t = double;
-    using column_t = std::vector<instance_value_t>;
-    std::vector<column_t> columns;
+    auto columns = std::accumulate(std::begin(instances), std::end(instances),
+                                   std::vector<column_t>{},
+                                   [] (auto& mem, const auto& instance) {
+        mem.push_back(std::accumulate(std::begin(instance), std::end(instance),
+                               column_t{},
+                               [buf = std::ostringstream{}] (auto& mem, char c) mutable {
+            if (c == DELIM) {
+                mem.push_back(std::stod(buf.str()));
+                buf.str("");
+                buf.clear();
+            } else {
+                buf << c;
+            }
+            return mem;
+        }));
+        return mem;
+    });
+
+    for (auto&& row : columns) {
+        for (auto&& col : row) {
+            std::cout << col << ", ";
+        }
+        std::cout << std::endl;
+    }
 
     std::cout << "Done!" << std::endl;
 }
